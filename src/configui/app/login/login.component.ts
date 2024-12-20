@@ -1,13 +1,17 @@
-/* eslint-disable no-console */
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { Credentials, LoginResult, LoginFailReason } from '../util/types';
+import { Credentials, LoginResult, LoginFailReason, Country } from '../util/types';
 import { LoginService } from '../login.service';
 
-import { Country, COUNTRIES } from '../countries';
+import { COUNTRIES } from '../countries';
+import { FormsModule } from '@angular/forms';
+import { NgbAlert, NgbPopover, NgbTooltip } from '@ng-bootstrap/ng-bootstrap';
+import { NgIf, NgFor } from '@angular/common';
+import { LucideAngularModule } from 'lucide-angular';
 
 enum LoginStep {
+  START = 0,
   LOGIN = 1,
   TFA = 2,
   CAPTCHA = 3,
@@ -16,6 +20,16 @@ enum LoginStep {
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
+  standalone: true,
+  imports: [
+    NgIf,
+    NgbAlert,
+    NgbPopover,
+    FormsModule,
+    NgbTooltip,
+    NgFor,
+    LucideAngularModule,
+  ],
 })
 export class LoginComponent implements OnInit {
   countries: Country[] = [];
@@ -35,30 +49,38 @@ export class LoginComponent implements OnInit {
 
   loginInProgress = false;
   loginFailed = false;
-  loginStep = LoginStep.LOGIN;
+  loginStep = LoginStep.START;
 
   firstLoginAssumed = false;
+
+  nodeJSIncompatible: boolean = true;
+  nodeJSversion: string = '1.1.1';
 
   emailIsValid = true;
   passwordIsValid = true;
   otpIsValid = true;
   captchaIsValid = true;
 
-  constructor(private loginService: LoginService, private routerService: Router) {}
+  constructor(private loginService: LoginService, private routerService: Router) { }
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
+    const r = await window.homebridge.request('/nodeJSVersion');
+    this.nodeJSversion = r.nodeJSversion;
+    this.nodeJSIncompatible = r.nodeJSIncompatible;
+
+    console.log('r: ', r);
+
     this.getCredentials();
     this.fillCountryArray();
   }
 
-  private getCredentials() {
-    this.loginService
-      .getCredentials()
-      .then((creds) => (this.credentials = creds))
-      .catch((err) => {
-        this.firstLoginAssumed = true;
-        console.log('Could not get config in login component: ' + err);
-      });
+  private async getCredentials() {
+    try {
+      this.credentials = this.loginService.getCredentials();
+    } catch (error) {
+      this.firstLoginAssumed = true;
+      console.log(error);
+    }
   }
 
   private fillCountryArray() {
@@ -93,8 +115,8 @@ export class LoginComponent implements OnInit {
     let loginResult: LoginResult | undefined = undefined;
     try {
       loginResult = await this.loginService.login(this.credentials);
-    } catch (err) {
-      console.log('login error: ' + err);
+    } catch (error) {
+      console.log('login error: ' + error);
     }
 
     this.evaluateLoginResult(loginResult);
@@ -104,8 +126,8 @@ export class LoginComponent implements OnInit {
     let loginResult: LoginResult | undefined = undefined;
     try {
       loginResult = await this.loginService.login({ verifyCode: this.otp });
-    } catch (err) {
-      console.log('login error: ' + err);
+    } catch (error) {
+      console.log('login error: ' + error);
     }
 
     this.evaluateLoginResult(loginResult);
@@ -120,8 +142,8 @@ export class LoginComponent implements OnInit {
           captchaId: this.captchaId,
         },
       });
-    } catch (err) {
-      console.log('login error: ' + err);
+    } catch (error) {
+      console.log('login error: ' + error);
     }
 
     this.evaluateLoginResult(loginResult);

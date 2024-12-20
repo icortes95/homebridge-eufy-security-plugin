@@ -1,13 +1,20 @@
-import { Component, OnInit, Input } from '@angular/core';
-import { Accessory } from '../../../app/accessory';
+import { Component, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { L_Device, L_Station } from '../../../app/util/types';
 import { PluginService } from '../../../app/plugin.service';
 import { ConfigOptionsInterpreter } from '../config-options-interpreter';
+import { FormsModule } from '@angular/forms';
+import { NgIf } from '@angular/common';
 
 @Component({
   selector: 'app-ignore-accessory',
   templateUrl: './ignore-accessory.component.html',
+  standalone: true,
+  imports: [FormsModule, NgIf],
 })
 export class IgnoreAccessoryComponent extends ConfigOptionsInterpreter implements OnInit {
+
+  identifier: string = '';
+
   constructor(pluginService: PluginService) {
     super(pluginService);
   }
@@ -23,38 +30,58 @@ export class IgnoreAccessoryComponent extends ConfigOptionsInterpreter implement
 
   /** updateConfig() takes an optional second parameter to specify the accessoriy for which the setting is changed */
 
-  @Input() accessory?: Accessory;
-  value = false;
+  @Input() accessory?: L_Station | L_Device;
+  @Input() isStation: boolean = false;
+  @Input() isDisabled: boolean = false;
+  @Output() ignored = new EventEmitter<boolean>();
+  value = true;
 
   async readValue() {
-    this.config = await this.pluginService.getConfig();
     if (this.accessory) {
-      const identifier = this.accessory.station ? 'ignoreStations' : 'ignoreDevices';
-      if (Array.isArray(this.config[identifier])) {
-        this.value = this.config[identifier].find((uId: string) => uId === this.accessory!.uniqueId) !== undefined;
+
+      if (this.isDisabled) {
+        this.value = false;
+        return;
       }
+
+      if (this.accessory.disabled) {
+        this.value = false;
+        return;
+      }
+
+      this.config = await this.pluginService.getConfig();
+      this.identifier = this.isStation ? 'ignoreStations' : 'ignoreDevices';
+      if (Array.isArray(this.config[this.identifier])) {
+        this.value = !(this.config[this.identifier].find((uId: string) => uId === this.accessory!.uniqueId) !== undefined);
+      }
+
     }
   }
 
   async update() {
+    if (this.isDisabled) {
+      return;
+    }
+
     if (!this.accessory) {
       return;
     }
 
-    const identifier = this.accessory.station ? 'ignoreStations' : 'ignoreDevices';
+    this.ignored.emit(!this.value); // Warn the parent app to show or hide the camera settings menu
+
     this.config = await this.pluginService.getConfig();
-    if (this.value) {
-      if (Array.isArray(this.config[identifier]) && !this.config[identifier].find((uId: string) => uId === this.accessory!.uniqueId)) {
-        this.config[identifier].push(this.accessory.uniqueId);
-      } else if (!Array.isArray(this.config[identifier])) {
-        this.config[identifier] = [this.accessory.uniqueId];
+    if (!this.value) {
+      if (Array.isArray(this.config[this.identifier]) && !this.config[this.identifier].find((uId: string) => uId === this.accessory!.uniqueId)) {
+        this.config[this.identifier].push(this.accessory.uniqueId);
+      } else if (!Array.isArray(this.config[this.identifier])) {
+        this.config[this.identifier] = [this.accessory.uniqueId];
       }
     } else {
       if (
-        Array.isArray(this.config[identifier]) &&
-        this.config[identifier].find((uId: string) => uId === this.accessory!.uniqueId) !== undefined
+        Array.isArray(this.config[this.identifier]) &&
+        this.config[this.identifier].find((uId: string) => uId === this.accessory!.uniqueId) !== undefined
       ) {
-        this.config[identifier] = this.config[identifier].filter((uId: string) => uId !== this.accessory!.uniqueId);
+        this.config[this.identifier] = this.config[this.identifier].filter((uId: string) => uId !== this.accessory!.uniqueId);
       }
     }
 

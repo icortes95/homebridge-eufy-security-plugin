@@ -1,42 +1,37 @@
-/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Injectable } from '@angular/core';
 import { PluginConfig } from '@homebridge/plugin-ui-utils/dist/ui.interface';
 
 import { PluginService } from './plugin.service';
-import { Credentials, LoginResult, LoginFailReason } from './util/types';
+import { Credentials, LoginResult } from './util/types';
 
 @Injectable({
   providedIn: 'root',
 })
 export class LoginService {
-  constructor(private pluginService: PluginService) {}
+  constructor(private pluginService: PluginService) { }
 
-  public async getCredentials(): Promise<Credentials> {
-    try {
-      const config = await this.pluginService.getConfig();
+  public getCredentials(): Credentials {
+    const config = this.pluginService.getConfig();
 
-      if (!config['username'] || !config['password']) {
-        return Promise.reject('no full credentials in config');
-      }
-
-      return Promise.resolve({
-        username: config['username'],
-        password: config['password'],
-        country: config['country'] ? config['country'] : 'US',
-        deviceName: config['deviceName'],
-      });
-    } catch (err) {
-      return Promise.reject('no config');
+    if (!config['username'] || !config['password']) {
+      throw new Error('no full credentials in config');
     }
+
+    return {
+      username: config['username'],
+      password: config['password'],
+      country: config['country'] ? config['country'] : 'US',
+      deviceName: config['deviceName'],
+    };
   }
 
   public async login(options: any): Promise<LoginResult> {
     try {
       const result = await window.homebridge.request('/login', options);
       return Promise.resolve(result as LoginResult);
-    } catch (err) {
-      return Promise.reject(err);
+    } catch (error) {
+      return Promise.reject(error);
     }
   }
 
@@ -44,9 +39,9 @@ export class LoginService {
     let config: PluginConfig = {};
 
     try {
-      config = await this.pluginService.getConfig();
-    } catch (err) {
-      console.log('Could not get credentials from config: ' + err);
+      config = this.pluginService.getConfig();
+    } catch (error) {
+      console.log('Could not get credentials from config: ', error);
     }
 
     config['username'] = credentials.username;
@@ -54,6 +49,7 @@ export class LoginService {
     config['country'] = credentials.country;
     config['deviceName'] = credentials.deviceName;
 
-    await this.pluginService.updateConfig(config, true);
+    await this.pluginService.updateConfig(config);
+    await this.pluginService.saveConfig();
   }
 }

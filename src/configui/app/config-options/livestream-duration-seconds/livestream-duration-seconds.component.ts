@@ -1,17 +1,20 @@
 import { Component, OnInit } from '@angular/core';
 import { PluginService } from '../../../app/plugin.service';
 import { ConfigOptionsInterpreter } from '../config-options-interpreter';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-livestream-duration-seconds',
   templateUrl: './livestream-duration-seconds.component.html',
+  standalone: true,
+  imports: [FormsModule],
 })
 export class LivestreamDurationSecondsComponent extends ConfigOptionsInterpreter implements OnInit {
   constructor(pluginService: PluginService) {
     super(pluginService);
   }
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
     this.readValue();
   }
 
@@ -22,24 +25,22 @@ export class LivestreamDurationSecondsComponent extends ConfigOptionsInterpreter
 
   /** updateConfig() takes an optional second parameter to specify the accessoriy for which the setting is changed */
 
-  value = 30;
+  CameraMaxLivestreamDuration = 30;
   inputIsInvalid = false;
 
   readValue() {
-    if (Object.prototype.hasOwnProperty.call(this.config, 'CameraMaxLivestreamDuration')) {
-      this.value = this.config['CameraMaxLivestreamDuration'];
-    }
+      this.CameraMaxLivestreamDuration = this.config['CameraMaxLivestreamDuration'] ?? this.CameraMaxLivestreamDuration;
   }
 
   update() {
     this.inputIsInvalid = false;
-    if (!this.value || this.value < 0) {
+    if (!this.CameraMaxLivestreamDuration || this.CameraMaxLivestreamDuration < 0) {
       this.inputIsInvalid = true;
     }
 
     if (!this.inputIsInvalid) {
       this.updateConfig({
-        CameraMaxLivestreamDuration: this.value,
+        CameraMaxLivestreamDuration: this.CameraMaxLivestreamDuration,
       });
     }
   }

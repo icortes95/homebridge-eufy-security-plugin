@@ -11,8 +11,9 @@ Homebridge plugin to control certain Eufy Security devices
 [![verified-by-homebridge](https://badgen.net/badge/homebridge/verified/purple)](https://github.com/homebridge/homebridge/wiki/Verified-Plugins)
 [![npm](https://img.shields.io/npm/dt/homebridge-eufy-security)](https://www.npmjs.com/package/homebridge-eufy-security)
 
-[![npm](https://img.shields.io/npm/v/homebridge-eufy-security/rc?label=rc)](https://github.com/homebridge-eufy-security/plugin/wiki/RC---Beta-Version)
-[![npm](https://img.shields.io/npm/v/homebridge-eufy-security/beta?label=beta)](https://github.com/homebridge-eufy-security/plugin/wiki/RC---Beta-Version)
+[![npm](https://img.shields.io/npm/v/homebridge-eufy-security/rc?label=rc)](https://github.com/homebridge-eufy-security/plugin/wiki/Special-Version-(BETA---RC---HKSV))
+[![npm](https://img.shields.io/npm/v/homebridge-eufy-security/beta?label=beta)](https://github.com/homebridge-eufy-security/plugin/wiki/Special-Version-(BETA---RC---HKSV))
+[![npm](https://img.shields.io/npm/v/homebridge-eufy-security/hksv?label=hksv)](https://github.com/homebridge-eufy-security/plugin/wiki/Special-Version-(BETA---RC---HKSV))
 [![Discord](https://img.shields.io/discord/432663330281226270?color=728ED5&logo=discord&label=hb-discord)](https://discord.com/channels/432663330281226270/876907345962229791)
 
 </span>
@@ -27,13 +28,13 @@ Homebridge plugin to control certain Eufy Security devices
 
 - To use this plugin, you will need to already have [Homebridge](https://homebridge.io) (at least v1.6.1)  installed. Refer to the links for more information and installation instructions.
 - For configuration Homebridge UI is recommenend. If you have 2FA enabled it is mandatory.
-- It is recommended to use the current LTS version of Node, currently v18.
+- It is recommended to use the latest LTS version within the **v20** branch of Node.js for optimal compatibility. Currently, this version is v20.11.0. Please note that using versions outside of this branch, including ~~**v20.11.1**~~, may result in compatibility issues. We advise against using Node.js versions beyond **v20.11.0** until compatibility with the plugin has been confirmed. If you encounter any issues, consider reverting to the recommended LTS version within the **v20** branch.
 
 #### Setup
 * [Installation](https://github.com/homebridge-eufy-security/plugin/wiki/Installation-and-Configuration#installation)
 * [Configuration](https://github.com/homebridge-eufy-security/plugin/wiki/Installation-and-Configuration#configuration)
 * [Bridged and Unbridged Mode](https://github.com/homebridge-eufy-security/plugin/wiki/Bridged-and-Unbridged-Mode-and-Problems)
-* [Beta Version](https://github.com/homebridge-eufy-security/plugin/wiki/Beta-Version)
+* [Beta Version](https://github.com/homebridge-eufy-security/plugin/wiki/Special-Version-(BETA---RC---HKSV))
 * [Uninstallation](https://github.com/homebridge-eufy-security/plugin/wiki/Uninstallation)
 
 #### Features
@@ -59,6 +60,7 @@ If you appreciate this plugin and want to support the work we do, you can use on
 **The guy who started it all**
 
 - **[samemory](https://ko-fi.com/S6S24XCVJ)**
+
 
 **And also**
 

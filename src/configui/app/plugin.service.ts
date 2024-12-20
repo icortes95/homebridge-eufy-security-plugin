@@ -1,21 +1,28 @@
-/* eslint-disable no-console */
 import { Injectable } from '@angular/core';
-import { fromEvent } from 'rxjs';
+import { Observable } from 'rxjs';
 
 import { PluginConfig } from '@homebridge/plugin-ui-utils/dist/ui.interface';
 
-import { Accessory } from './accessory';
+import { L_Device, L_Station } from './util/types';
 
 @Injectable({
   providedIn: 'root',
 })
 export class PluginService extends EventTarget {
-  private stations: Accessory[] = [];
-  private devices: Accessory[] = [];
+  private stations: L_Station[] = [];
 
-  private accessories$ = fromEvent(window.homebridge, 'addAccessory');
+  private accessories$ = new Observable<Event>((subscriber) => { // Explicitly typing the Observable to emit Event
+    const handler = (event: Event) => subscriber.next(event);
+    window.homebridge.addEventListener('addAccessory', handler);
+    return () => {
+      window.homebridge.removeEventListener('addAccessory', handler);
+    };
+  });
 
-  private config?: PluginConfig;
+  public config: PluginConfig[] = [{
+    "platform": "EufySecurity",
+    "name": "EufySecurity"
+  }];
 
   constructor() {
     super();
@@ -23,103 +30,107 @@ export class PluginService extends EventTarget {
   }
 
   private init() {
-    this.accessories$.subscribe((event) => {
-      this.loadStoredAccessories();
+
+    this.getPlatformConfig();
+
+    this.accessories$.subscribe((value: Event) => {
+      const v = value as MessageEvent;
+      this.stations = v.data;
     });
 
     this.loadStoredAccessories();
   }
 
-  public getStations(): Accessory[] {
+  public getStations(): L_Station[] {
     return this.stations;
   }
 
-  public getDevices(): Accessory[] {
-    return this.devices;
-  }
-
-  public getStation(uniqueId: string | null): Accessory | undefined {
+  public getStation(uniqueId: string | null): L_Station | undefined {
     return this.stations.find((s) => s.uniqueId === uniqueId);
   }
 
-  public getDevice(uniqueId: string | null): Accessory | undefined {
-    return this.devices.find((d) => d.uniqueId === uniqueId);
+  public getDevice(uniqueId: string | null): L_Device | undefined {
+    for (const station of this.stations) {
+      if (station.devices) {
+        const foundDevice = station.devices.find(device => device.uniqueId === uniqueId);
+        if (foundDevice) {
+          return foundDevice;
+        }
+      }
+    }
+    return undefined; // Device not found
   }
 
   public async loadStoredAccessories(): Promise<boolean> {
     try {
-      const accessories = (await window.homebridge.request('/storedAccessories')) as Accessory[];
-      accessories.forEach((accessory) => {
-        this.addAccessory(accessory);
+      const stations = (await window.homebridge.request('/storedAccessories')) as L_Station[];
+      stations.forEach((station) => {
+        this.addAccessory(station);
       });
-      if (accessories.length !== 0) {
+      if (stations.length !== 0) {
         this.dispatchEvent(new Event('newAccessories'));
       }
-      return Promise.resolve(accessories.length !== 0);
-    } catch (err) {
-      return Promise.reject(err);
+      return Promise.resolve(stations.length !== 0);
+    } catch (error) {
+      return Promise.reject(error);
     }
   }
 
-  private addAccessory(accessory: Accessory) {
-    const targetArray = accessory.station ? this.stations : this.devices;
-
-    if (!targetArray.find((a) => a.uniqueId === accessory.uniqueId)) {
-      targetArray.push(accessory);
+  private addAccessory(station: L_Station) {
+    if (!this.stations.find((a) => a.uniqueId === station.uniqueId)) {
+      this.stations.push(station);
     }
   }
 
-  public async getConfig(): Promise<PluginConfig> {
-    if (this.config) {
-      return Promise.resolve(this.config);
-    }
-
-    return this.getPlatformConfig();
-  }
-
-  public async updateConfig(config: PluginConfig, save?: boolean): Promise<void> {
-    try {
-      await window.homebridge.updatePluginConfig([config]);
-      this.config = config;
-      if (save) {
-        await window.homebridge.savePluginConfig();
-      }
-      this.dispatchEvent(new Event('configChanged'));
-    } catch (err) {
-      console.log('There was an error updating the credentials in your config: ' + err);
-    }
-  }
-
-  private async getPlatformConfig(): Promise<PluginConfig> {
+  public getConfig(): PluginConfig {
     // always use the first platform config since there is only one supported
-    try {
-      const configs = await window.homebridge.getPluginConfig();
+    return this.config[0];
+  }
 
-      if (configs.length > 0) {
-        this.config = configs[0];
-        this.config['platform'] = 'EufySecurity';
-        return Promise.resolve(configs[0]);
-      } else {
-        return Promise.reject('Could not get Platform config');
-      }
-    } catch (err) {
-      return Promise.reject(err);
+  public async updateConfig(config: PluginConfig): Promise<void> {
+    try {
+      this.config = [config];
+      await window.homebridge.updatePluginConfig(this.config);
+      this.dispatchEvent(new Event('configChanged'));
+    } catch (error) {
+      console.log('There was an error updating your config: ', error, this.config);
     }
   }
 
-  public async getCachedName(accessory: Accessory): Promise<string | undefined> {
-    const cachedAccessories = await window.homebridge.getCachedAccessories();
-    let name: string | undefined = undefined;
-    cachedAccessories.forEach((cachedAccessory) => {
-      if (
-        cachedAccessory.context &&
-        cachedAccessory.context['device'] &&
-        cachedAccessory.context['device']['uniqueId'] === accessory.uniqueId &&
-        cachedAccessory.context['device']['station'] === accessory.station
-      ) {
-        name = cachedAccessory.context['device']['displayName'];
-      }
-    });
-    return Promise.resolve(name);
+  private async getPlatformConfig(): Promise<PluginConfig[]> {
+    try {
+      const newConfig = await window.homebridge.getPluginConfig();
+      this.config = newConfig.length > 0 ? newConfig : this.config;
+    } catch (error) {
+      console.error('Error fetching plugin config:', error);
+    }
+    return this.config;
+  }
+
+  /**
+   * Saves the configuration changes made by the user.
+   * 
+   * @returns A Promise that resolves when the configuration is successfully saved.
+   */
+  public async saveConfig(): Promise<void> {
+    try {
+      await window.homebridge.savePluginConfig();
+    } catch (error) {
+      console.log('There was an error when saving config: ', error);
+    }
+  }
+
+  /**
+   * Resets the configuration to default settings.
+   * 
+   * @returns A Promise that resolves when the configuration is successfully reset.
+   */
+  public async resetConfig(): Promise<void> {
+    try {
+      await window.homebridge.updatePluginConfig([{}]);
+      await window.homebridge.savePluginConfig();
+    } catch (error) {
+      console.log('There was an error when reseting config: ', error);
+    }
   }
 }

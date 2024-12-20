@@ -1,5 +1,14 @@
-export const DEFAULT_CONFIG_VALUES = {
+import { CameraConfig } from '../../../plugin/utils/configTypes';
+import { EufySecurityPlatformConfig } from '../../../plugin/config';
+
+export const DEFAULT_CONFIG_VALUES: EufySecurityPlatformConfig = {
+  platform: 'EufySecurity',
+  name: 'EufySecurity',
+  username: '',
+  password: '',
+  deviceName: 'MyPhone',
   enableDetailedLogging: false,
+  omitLogFiles: false,
   CameraMaxLivestreamDuration: 30,
   pollingIntervalMinutes: 10,
   hkHome: 1,
@@ -9,19 +18,23 @@ export const DEFAULT_CONFIG_VALUES = {
   ignoreStations: [],
   ignoreDevices: [],
   country: 'US',
+  stations: [],
   cameras: [],
   cleanCache: true,
-  unbridge: true,
+  ignoreMultipleDevicesWarning: false,
+  autoSyncStation: false,
 };
 
-export const DEFAULT_CAMERACONFIG_VALUES = {
+export const DEFAULT_CAMERACONFIG_VALUES: CameraConfig = {
   enableButton: true,
   motionButton: true,
+  lightButton: true,
+  talkback: false,
+  talkbackChannels: 1,
+  hsv: false,
+  hsvRecordingDuration: 90,
   rtsp: false,
-  enableCamera: false,
-  forcerefreshsnap: false,
-  useCachedLocalLivestream: false,
-  useEnhancedSnapshotBehaviour: true,
+  enableCamera: true,
   refreshSnapshotIntervalMinutes: 0,
   snapshotHandlingMethod: 3,
   immediateRingNotificationWithoutSnapshot: false,

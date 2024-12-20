@@ -122,11 +122,12 @@ dist
 
 .npmrc
 .history
-
-.github/workflows/
+.nx/
 
 .angular
 
 homebridge-ui/
+
+src/plugin/version.ts
 
 TODO

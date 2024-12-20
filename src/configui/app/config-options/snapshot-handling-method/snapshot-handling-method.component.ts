@@ -1,55 +1,76 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { Accessory } from '../../../app/accessory';
+import { L_Device } from '../../../app/util/types';
 import { PluginService } from '../../../app/plugin.service';
-import { DEFAULT_CAMERACONFIG_VALUES } from '../../../app/util/default-config-values';
+import { DEFAULT_CAMERACONFIG_VALUES, DEFAULT_CONFIG_VALUES } from '../../../app/util/default-config-values';
 import { ConfigOptionsInterpreter } from '../config-options-interpreter';
 
-import { faPlusCircle, faMinusCircle, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { LucideAngularModule } from 'lucide-angular';
+import { ChargingType } from '../../util/types';
+import { RouterLink } from '@angular/router';
+import { NgIf, NgFor } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-snapshot-handling-method',
   templateUrl: './snapshot-handling-method.component.html',
   styles: [],
+  standalone: true,
+  imports: [
+    FormsModule,
+    NgIf,
+    RouterLink,
+    NgFor,
+    LucideAngularModule,
+  ],
 })
 export class SnapshotHandlingMethodComponent extends ConfigOptionsInterpreter implements OnInit {
+  @Input() device?: L_Device;
+
+  value = DEFAULT_CAMERACONFIG_VALUES.snapshotHandlingMethod;
+  ignoreMultipleDevicesWarning = DEFAULT_CONFIG_VALUES.ignoreMultipleDevicesWarning;
+  chargingStatus = ChargingType.PLUGGED;
+  standalone = false;
+
   constructor(pluginService: PluginService) {
     super(pluginService);
   }
 
-  ngOnInit(): void {
-    this.readValue();
+  async ngOnInit(): Promise<void> {
+    await this.readValue();
   }
 
-  /** Customize from here */
-  /** updateConfig() will overwrite any settings that you'll provide */
-  /** Don't try and 'append'/'push' to arrays this way - add a custom method instead */
-  /** see config option to ignore devices as example */
-
-  /** updateConfig() takes an optional second parameter to specify the accessoriy for which the setting is changed */
-
-  plusIcon = faPlusCircle;
-  minusIcon = faMinusCircle;
-  mediumIcon = faCircle;
-
-  @Input() accessory?: Accessory;
-  value = DEFAULT_CAMERACONFIG_VALUES.snapshotHandlingMethod;
-
   async readValue() {
-    const config = await this.getCameraConfig(this.accessory?.uniqueId || '');
+    const uniqueId = this.device?.uniqueId || '';
 
-    if (config && Object.prototype.hasOwnProperty.call(config, 'snapshotHandlingMethod')) {
-      this.value = config['snapshotHandlingMethod'];
-    } else if (config && Object.prototype.hasOwnProperty.call(config, 'forcerefreshsnap')) {
-      this.value = config['forcerefreshsnap'] ? 1 : 3;
+    if (this.device) {
+
+      this.chargingStatus = this.device.chargingStatus!;
+      this.standalone = this.device.standalone;
+
+      this.ignoreMultipleDevicesWarning = this.config['ignoreMultipleDevicesWarning'] ?? this.ignoreMultipleDevicesWarning;
+
+      const config = this.getCameraConfig(uniqueId);
+      this.value = config['snapshotHandlingMethod'] ?? this.value;
+
+      if (!this.ignoreMultipleDevicesWarning && !this.standalone) {
+        this.value = 3;
+        this.update();
+      }
+
     }
   }
 
   update() {
-    this.updateConfig(
-      {
-        snapshotHandlingMethod: this.value,
-      },
-      this.accessory,
+
+    if (!this.ignoreMultipleDevicesWarning && !this.standalone) {
+      this.value = 3;
+    }
+
+    // Update the configuration with snapshotHandlingMethod
+
+    this.updateDeviceConfig(
+      { snapshotHandlingMethod: this.value },
+      this.device!,
     );
   }
 }

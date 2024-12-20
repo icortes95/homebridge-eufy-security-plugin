@@ -3,16 +3,20 @@ import { Component, NgZone, OnInit } from '@angular/core';
 import { Router, NavigationStart } from '@angular/router';
 
 import { Buffer } from 'buffer';
+import { NgIf } from '@angular/common';
+import { NgbProgressbar } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'app-download-logs',
   templateUrl: './download-logs.component.html',
-  styles: [
-  ],
+  styles: [],
+  standalone: true,
+  imports: [NgIf, NgbProgressbar],
 })
 export class DownloadLogsComponent implements OnInit {
 
-  private routeSub: any;
+  progress: number = 0;
+  status: string = '';
 
   constructor(
     private router: Router,
@@ -21,10 +25,9 @@ export class DownloadLogsComponent implements OnInit {
 
   ngOnInit(): void {
 
-    this.routeSub = this.router.events.subscribe((event) => {
+    this.router.events.subscribe((event) => {
       if (event instanceof NavigationStart) {
         if (this.logFileLocation !== '') {
-          // eslint-disable-next-line no-console
           console.log('revoke log zip file blob location url.');
           window.URL.revokeObjectURL(this.logFileLocation);
           this.logFileLocation = '';
@@ -32,10 +35,13 @@ export class DownloadLogsComponent implements OnInit {
       }
     });
 
-    window.homebridge.addEventListener('downloadLogsFileCount', (event: any) => {
+    window.homebridge.addEventListener('downloadLogsProgress', (event: any) => {
       const data = event['data'] as any;
-      const numberOfFiles = data['numberOfFiles'] as number;
-      this.updateDownloadMessage(`Compressing ${numberOfFiles} log files...`);
+      console.log('downloadLogsProgress', data);
+      this.zone.run(() => {
+        this.progress = data['progress'] as number;
+        this.status = data['status'] as string;
+      });
     });
   }
 
@@ -49,38 +55,30 @@ export class DownloadLogsComponent implements OnInit {
   async downloadLogs() {
     try {
       this.isDownloading = true;
-      const bufferData = await window.homebridge.request('/downloadLogs') as {type: string; data: number[]};
+
+      const bufferData = await window.homebridge.request('/downloadLogs') as { type: string; data: number[] };
       const buffer = Buffer.from(bufferData.data);
 
       const file = new File([buffer], 'logs.zip', { type: 'application/zip' });
-      const url= window.URL.createObjectURL(file);
-      
+      const url = window.URL.createObjectURL(file);
+
       this.logFileLocation = url;
-      window.open(this.logFileLocation);
+      // window.open(this.logFileLocation);
 
-      this.updateDownloadMessage(undefined);
       this.hasDownloaded = true;
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.log(err);
+    } catch (error) {
+      console.log(error);
 
-      const error = err as { message: string };
+      const err = error as { message: string };
       this.failed = true;
-      this.updateDownloadMessage(undefined);
-      this.failureMessage = `Generating of compressed logs.zip file did not complete: ${error.message}`;
+      this.failureMessage = `Generating of compressed logs.zip file did not complete: ${err.message}`;
     } finally {
       this.isDownloading = false;
     }
   }
-  
+
   openLink() {
     window.open(this.logFileLocation);
-  }
-
-  private updateDownloadMessage(message?: string) {
-    this.zone.run(() => {
-      this.downloadMessage = message;
-    });
   }
 
 }

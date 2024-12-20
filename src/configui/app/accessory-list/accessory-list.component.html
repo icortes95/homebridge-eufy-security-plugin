@@ -1,126 +1,132 @@
 <ng-template #reloadModal let-modal>
-    <div class="modal-header">
-        <h4 class="modal-title" id="modal-basic-title">Refresh stations and devices</h4>
-        <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  <div class="modal-header">
+    <h4 class="modal-title" id="modal-basic-title">Refresh stations and devices</h4>
+    <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss('Cross click')"></button>
+  </div>
+  <div class="modal-body">
+    <div class="mb-3">
+      <p>To initiate a full station and device refresh, you will need to log into your eufy account. However,
+        please be aware that this action may interfere with the plugin's connection to the eufy cloud.</p>
+      <ngb-alert [dismissible]="false">
+        We strongly recommend that you <strong>stop</strong> the plugin before proceeding further.
+      </ngb-alert>
+      <p>Otherwise, you may experience glitches such as push notifications from the plugin no longer functioning
+        correctly. (See <a href="https://github.com/homebridge-eufy-security/plugin/issues/59#issuecomment-1147314942"
+          target="_blank" rel="noopener noreferrer">here</a> for more information).</p>
     </div>
-    <div class="modal-body">
-            <div class="mb-3">
-                To refresh all stations and devices you will be logged into your eufy account. This can interfere with the plugins connection to the eufy cloud.
-                <p></p><b style="color: #dc3545">We strongly recommened that you restart the plugin after you're done with the configuration even if you didn't change any settings.</b><p></p>
-                Otherwise you might experience glitches like no longer working push notifications for the plugin (see <a href="https://github.com/homebridge-eufy-security/plugin/issues/59#issuecomment-1147314942" target="_blank" rel="noopener noreferrer">here</a> for more information).
-            </div>
-    </div>
-    <div class="modal-footer">
-        <a routerLink="/login" class="btn btn-success" (click)="modal.close('Login')">Login with eufy</a>
-    </div>
+  </div>
+  <div class="modal-footer">
+    <a routerLink="/login" class="btn btn-success" (click)="modal.close('Login')">Login with eufy</a>
+  </div>
 </ng-template>
 
-<div *ngIf="stations.length === 0 && devices.length === 0" class="container">
-    <div class="row pl-5 pr-5">
-        <div class="col" style="max-width: 20%;"></div>
-        <div class="col d-flex justify-content-center">
-            <div class="card shadow-sm text-center pt-3 pb-3" style="width: 100%;">
-                <div class="mx-auto">
-                    Loading Accessories...
-                    <div class="progress" style="height: 8px;">
-                        <div class="progress-bar progress-bar-striped bg-info progress-bar-animated" role="progressbar"
-                            aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="width: 75%;"></div>
-                    </div>
+<ng-container *ngIf="!adminAccountUsed; else adminAccountUsedTemplate">
+  <div class="text-end">
+    <button type="button" class="btn btn-success" (click)="openReloadModal(reloadModal)"
+      (keydown.enter)="openReloadModal(reloadModal)" placement="bottom" ngbTooltip="Re Sync">
+      <lucide-angular name="refresh-cw"></lucide-angular>
+    </button>
+    <button type="button" class="btn btn-warning" placement="bottom" ngbTooltip="Having a bug?"
+      routerLink="/githubissue">
+      <lucide-angular name="bug"></lucide-angular>
+    </button>
+    <button type="button" class="btn btn-danger" placement="bottom" ngbTooltip="Global Settings"
+      routerLink="/advancedConfig">
+      <lucide-angular name="sliders-horizontal"></lucide-angular>
+    </button>
+  </div>
+
+  <ng-container *ngIf="stations$ | async as stations; else noStations">
+    <ng-container *ngIf="stations.length !== 0; else noStations">
+      <ng-container *ngIf="versionUnmatched; else stationsContent">
+        <p></p>
+        <ngb-alert type="warning" [dismissible]="false">
+          <a (click)="openReloadModal(reloadModal)" (keydown.enter)="openReloadModal(reloadModal)" tabindex="0">
+            Plugin has been updated, please refresh and reboot the plugin.
+          </a>
+        </ngb-alert>
+        <p></p>
+      </ng-container>
+
+      <ng-template #stationsContent>
+        <p></p>
+        <span>Click the name to access accessory configuration.</span>
+        <p></p>
+
+        <div class="row row-cols-md-4">
+          <ng-container *ngFor="let station of stations; trackBy: trackByStationId">
+            <ng-container *ngIf="station && station.devices?.length !== 0">
+
+              <ng-container *ngIf="station.devices[0].uniqueId === station.uniqueId; else separateDevices">
+                <div class="col-4 mb-4">
+                  <ng-container
+                    *ngTemplateOutlet="cardTemplate; context: { $implicit: station, type: 'both' }"></ng-container>
                 </div>
-            </div>
+              </ng-container>
+
+              <ng-template #separateDevices>
+                <div class="col-4 mb-4">
+                  <ng-container
+                    *ngTemplateOutlet="cardTemplate; context: { $implicit: station, type: 'station' }"></ng-container>
+                </div>
+                <ng-container *ngFor="let device of station.devices; trackBy: trackByDeviceId">
+                  <div class="col-4 mb-4">
+                    <ng-container
+                      *ngTemplateOutlet="cardTemplate; context: { $implicit: device, type: 'device' }"></ng-container>
+                  </div>
+                </ng-container>
+              </ng-template>
+
+            </ng-container>
+          </ng-container>
         </div>
-        <div class="col" style="max-width: 20%;"></div>
+
+      </ng-template>
+    </ng-container>
+  </ng-container>
+</ng-container>
+
+<ng-template #adminAccountUsedTemplate>
+  <div>
+    <div class="alert alert-danger" role="alert">
+      You're not using a guest admin account with this plugin! You must use a guest admin account!
+      Please look here for more details:
+      https://github.com/homebridge-eufy-security/plugin/wiki/Create-a-dedicated-admin-account-for-Homebridge-Eufy-Security-Plugin
     </div>
-</div>
+    <button class="btn btn-primary" type="button" routerLink="/login">Cancel</button>
+  </div>
+</ng-template>
 
-<div *ngIf="stations.length !== 0 || devices.length !== 0" class="container">
+<ng-template #noStations>
+  <div class="alert alert-info" role="alert">
+    No stations found.
+    Please wait a few seconds and try again.
+    Please check your configuration or try refreshing.
+    Did you change the country settings?
+    If the problem persists, please open an issue.
+  </div>
+</ng-template>
 
-    <div class="row">
-        <div class="col-6">
-            <button type="button" class="btn btn-success" (click)="openReloadModal(reloadModal)">
-                <fa-icon [icon]="reloadIcon" size="lg"></fa-icon>
-            </button>
-        </div>
-        <div class="col-6 text-end">
-            <a routerLink="/advancedConfig" class="btn btn-secondary">Plugin Settings</a>
-        </div>
-    </div>
-
-    <p></p>
-    <span>Click on any device below to access its settings.</span>
-    <p></p>
+<ng-template #cardTemplate let-item let-type="type">
+  <a [routerLink]="['/config', type, item.uniqueId]">
     <div class="card">
-        <div class="card-header">
-            Stations
-        </div>
-        <div class="card-body pt-0 pb-0">
-            <div class="row">
-
-                <div *ngFor="let station of stations" class="col-6 col-sm-4 mt-3 mb-3 d-flex flex-column align-items-center">
-
-                    <div class="col-12 col-sm-7">
-                        <div class="text-center">
-                            <a routerLink="/stationConfig/{{station.uniqueId}}" style="color: black;">
-                                <div class="device ratio ratio-1x1 border rounded shadow-sm">
-                                    <img class="deviceimage" [src]="'assets/devices/' + (DeviceImage.get(station.type) ? DeviceImage.get(station.type)?.image : 'unknown.png')" [attr.style]="getDevicePanelStyle(station)">
-                                    <span class="devicesettingsicon d-flex border align-items-center justify-content-center" style="z-index: 15;">
-                                        <fa-icon [icon]="settingsIcon" size="2x"></fa-icon>
-                                    </span>
-                                    <span *ngIf="station.ignored" class="d-flex border align-items-top justify-content-end" style="z-index: 20;">
-                                        <fa-icon [icon]="ignoreIcon" class="mt-sm-1 m-sm-2 m-1 mt-0" size="xs"></fa-icon>
-                                    </span>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                        
-                    <span class="col-12 text-center">{{ station.cachedName ? station.cachedName : station.displayName }}</span>
-                    <span class="col-12 serial fw-light text-center">({{station.uniqueId}})</span>
-                    
-                </div>
-            </div>
-        </div>
+      <div class="position-absolute top-0 end-0">
+        <span class="d-flex p-2" style="z-index: 20;">
+          <ng-container [ngSwitch]="true">
+            <lucide-angular *ngSwitchCase="type === 'both'"
+              [ngbTooltip]="item.ignored ? 'Security Control OFF' : 'Security Control ON'"
+              [name]="item.ignored ? 'shield-off' : 'shield'">
+            </lucide-angular>
+            <lucide-angular *ngSwitchCase="type === 'device' && item.isKeypad" name="shield-alert" color="red">
+            </lucide-angular>
+          </ng-container>
+        </span>
+      </div>
+      <img class="card-img p-4" [src]="'assets/devices/' + (DeviceImage.get(item.type)?.image || 'unknown.png')"
+        [style.opacity]="(type === 'both' ? item.devices[0].ignored : item.ignored) ? 0.3 : 1" [alt]="item.displayName">
+      <div class="card-img-overlay">
+        <h5 class="card-title position-absolute bottom-0">{{ item.displayName }}</h5>
+      </div>
     </div>
-    <p></p>
-    <div class="card">
-        <div class="card-header">
-            Devices
-        </div>
-        <div class="card-body">
-            <div class="row">
-
-                <div *ngFor="let device of devices" class="col-6 col-sm-4 mt-3 mb-3 d-flex flex-column align-items-center">
-
-                    <div class="col-12 col-sm-7">
-                        <div class="text-center">
-                            <a routerLink="/cameraConfig/{{device.uniqueId}}" style="color: black;">
-                                <div class="device ratio ratio-1x1 border rounded shadow-sm">
-                                    <img class="deviceimage" [src]="'assets/devices/' + (DeviceImage.get(device.type) ? DeviceImage.get(device.type)?.image : 'unknown.png')" [attr.style]="getDevicePanelStyle(device)">
-                                    <span class="devicesettingsicon d-flex border align-items-center justify-content-center" style="z-index: 15;">
-                                        <fa-icon [icon]="settingsIcon" size="2x"></fa-icon>
-                                    </span>
-                                    <span *ngIf="device.ignored" class="d-flex border align-items-top justify-content-end" style="z-index: 20;">
-                                        <fa-icon [icon]="ignoreIcon" class="mt-sm-1 m-sm-2 m-1 mt-0" size="xs"></fa-icon>
-                                    </span>
-                                </div>
-                            </a>
-                        </div>
-                    </div>
-                        
-                    <span class="col-12 text-center">{{ device.cachedName ? device.cachedName : device.displayName }}</span>
-                    <span class="col-12 serial fw-light text-center">({{device.uniqueId}})</span>
-                    
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    <p></p>
-
-    <span><i>The images used above are 'best effort' for now, since we do not own every eufy device.
-        If you experience that your device is depicted with a wrong image please feel free to let
-        us know in an issue on our <a href="https://github.com/homebridge-eufy-security/plugin" target="_blank" rel="noopener noreferrer">Github page.</a></i>
-    </span>
-
-</div>
+  </a>
+</ng-template>

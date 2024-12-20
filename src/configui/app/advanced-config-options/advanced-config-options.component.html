@@ -1,30 +1,22 @@
-<a routerLink="/accessories" class="btn btn-secondary mb-3">Back to Devices List</a>
-<div class="card">
-  <div class="card-header">
-      Advanced Settings
-  </div>
-  <div class="card-body pt-0 pb-4">
-    
-    <!-- Put config options components here -->
-    <app-edit-credentials></app-edit-credentials>
-    <hr />
-    <app-polling-interval-minutes></app-polling-interval-minutes>
-    <hr />
-    <app-livestream-duration-seconds></app-livestream-duration-seconds>
-    <hr />
-    <app-enable-detailed-logging></app-enable-detailed-logging>
-    <hr />
-    <app-omit-log-files></app-omit-log-files>
-    <hr />
-    <app-clean-cache></app-clean-cache>
-    <hr />
-    <app-unbridge-accessory></app-unbridge-accessory>
-    <hr />
-    <app-guard-modes-mapping></app-guard-modes-mapping>
-    <hr />
-    <app-download-logs></app-download-logs>
-    <hr />
-    <app-reset-plugin></app-reset-plugin>
-    
-  </div>
-</div>
+<a routerLink="/accessories" class="btn btn-primary mb-3">
+  <lucide-angular name="chevron-left"></lucide-angular> Back
+</a>
+
+<h6> Advanced Settings </h6>
+
+<!-- Put config options components here -->
+<app-edit-credentials></app-edit-credentials>
+<hr />
+<app-polling-interval-minutes></app-polling-interval-minutes>
+<hr />
+<app-livestream-duration-seconds></app-livestream-duration-seconds>
+<hr />
+<app-ignore-multiple-devices-warning></app-ignore-multiple-devices-warning>
+<hr />
+<app-auto-sync-station></app-auto-sync-station>
+<hr />
+<app-omit-log-files></app-omit-log-files>
+<hr />
+<app-clean-cache></app-clean-cache>
+<hr />
+<app-guard-modes-mapping></app-guard-modes-mapping>

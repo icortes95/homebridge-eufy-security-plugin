@@ -1,11 +1,15 @@
 import { Component, Input, OnInit } from '@angular/core';
-import { Accessory } from '../../../app/accessory';
+import { L_Device } from '../../../app/util/types';
 import { PluginService } from '../../../app/plugin.service';
 import { ConfigOptionsInterpreter } from '../config-options-interpreter';
+import { FormsModule } from '@angular/forms';
+import { DEFAULT_VIDEOCONFIG_VALUES } from '../../../../plugin/utils/configTypes';
 
 @Component({
   selector: 'app-enable-audio',
   templateUrl: './enable-audio.component.html',
+  standalone: true,
+  imports: [FormsModule],
 })
 export class EnableAudioComponent extends ConfigOptionsInterpreter implements OnInit {
   constructor(pluginService: PluginService) {
@@ -23,12 +27,12 @@ export class EnableAudioComponent extends ConfigOptionsInterpreter implements On
 
   /** updateConfig() takes an optional second parameter to specify the accessoriy for which the setting is changed */
 
-  @Input() accessory?: Accessory;
-  value = false;
+  @Input() device?: L_Device;
+  value = DEFAULT_VIDEOCONFIG_VALUES.audio;
   samplerate = 0;
 
   async readValue() {
-    const config = await this.getCameraConfig(this.accessory?.uniqueId || '');
+    const config = this.getCameraConfig(this.device?.uniqueId || '');
 
     if (config && config['videoConfig'] && Object.prototype.hasOwnProperty.call(config['videoConfig'], 'audio')) {
       this.value = config['videoConfig']['audio'];
@@ -42,15 +46,15 @@ export class EnableAudioComponent extends ConfigOptionsInterpreter implements On
   }
 
   async update() {
-    if (!this.accessory) {
+    if (!this.device) {
       return;
     }
 
-    let config = await this.getCameraConfig(this.accessory?.uniqueId || '');
+    let config = this.getCameraConfig(this.device?.uniqueId || '');
 
     if (!config) {
       config = {
-        serialNumber: this.accessory?.uniqueId,
+        serialNumber: this.device?.uniqueId,
         videoConfig: {},
       };
     }
@@ -61,6 +65,6 @@ export class EnableAudioComponent extends ConfigOptionsInterpreter implements On
     config['videoConfig']['audio'] = this.value;
     config['videoConfig']['audioSampleRate'] = this.samplerate;
 
-    this.updateConfig(config, this.accessory);
+    this.updateDeviceConfig(config, this.device);
   }
 }

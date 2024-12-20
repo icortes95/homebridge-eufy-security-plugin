@@ -1,108 +1,89 @@
-/* eslint-disable no-console */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { PluginConfig } from '@homebridge/plugin-ui-utils/dist/ui.interface';
-import { Accessory } from '../accessory';
+import { L_Device, L_Station } from '../util/types';
 import { PluginService } from '../plugin.service';
 import { DEFAULT_CONFIG_VALUES } from '../../app/util/default-config-values';
 
 export class ConfigOptionsInterpreter {
-  config: PluginConfig;
+  public config: PluginConfig;
 
   constructor(protected pluginService: PluginService) {
-    this.config = DEFAULT_CONFIG_VALUES;
-    this.pluginService
-      .getConfig()
-      .then((config) => {
-        this.config = {...this.config, config};
-      })
-      .catch((err) => console.log('Could not get config in config interpreter: ' + err));
+    this.config = this.pluginService.getConfig();
   }
 
-  protected async getCameraConfig(uniqueId: string): Promise<any> {
-    const config = await this.pluginService.getConfig();
-
-    if (Array.isArray(config['cameras'])) {
-      return Promise.resolve(config['cameras'].find((cc) => cc['serialNumber'] === uniqueId));
+  protected getCameraConfig(uniqueId: string): any {
+    if (Array.isArray(this.config['cameras'])) {
+      return this.config['cameras'].find((cc: any) => cc.serialNumber === uniqueId) || undefined;
     } else {
-      return Promise.resolve(undefined);
+      return undefined;
     }
   }
 
-  protected async getStationConfig(uniqueId: string): Promise<any> {
-    const config = await this.pluginService.getConfig();
-
-    if (Array.isArray(config['stations'])) {
-      return Promise.resolve(config['stations'].find((sc) => sc['serialNumber'] === uniqueId));
+  protected getStationConfig(uniqueId: string): any {
+    if (Array.isArray(this.config['stations'])) {
+      return this.config['stations'].find((sc: any) => sc.serialNumber === uniqueId) || undefined;
     } else {
-      return Promise.resolve(undefined);
+      return undefined;
     }
   }
 
-  protected async updateConfig(options: any, accessory?: Accessory) {
-    // TODO: test extensively
-    // TODO: remove config since it initializes too late if member was inputed to child --> stack overflow
-    let config = await this.pluginService.getConfig();
+  protected async updateConfig(options: any) {
 
-    if (!accessory) {
-      config = {
-        ...DEFAULT_CONFIG_VALUES,
-        ...config,
+    this.config = {
+      ...DEFAULT_CONFIG_VALUES,
+      ...this.config,
+      ...options,
+    };
+
+    console.log('config:', this.config);
+
+    // Update the configuration
+    await this.pluginService.updateConfig(this.config);
+  }
+
+  protected async updateAccessoryConfig(options: any, accessory: L_Station | L_Device, type: 'camera' | 'station') {
+    let configArray: any[];
+
+    if (type === 'camera') {
+      if (!Array.isArray(this.config['cameras'])) {
+        this.config['cameras'] = [];
+      }
+      configArray = this.config['cameras'];
+    } else if (type === 'station') {
+      if (!Array.isArray(this.config['stations'])) {
+        this.config['stations'] = [];
+      }
+      configArray = this.config['stations'];
+    } else {
+      throw new Error('Unsupported accessory type');
+    }
+
+    const accessoryConfigIndex = configArray.findIndex((config: any) => config.serialNumber === accessory.uniqueId);
+
+    if (accessoryConfigIndex >= 0) {
+      // Update existing config
+      configArray[accessoryConfigIndex] = {
+        ...configArray[accessoryConfigIndex],
         ...options,
       };
+    } else {
+      // Add new config
+      configArray.push({
+        serialNumber: accessory.uniqueId,
+        ...options,
+      });
     }
 
-    if (accessory && accessory.station === false) {
-      if (!Array.isArray(config['cameras'])) {
-        config['cameras'] = [];
-      }
-
-      let cameraConfigIndex = -1;
-      config['cameras'].forEach((cc: { serialNumber: string }, i: number) => {
-        if (cc.serialNumber === accessory.uniqueId) {
-          cameraConfigIndex = i;
-        }
-      });
-
-      if (cameraConfigIndex >= 0) {
-        // update cameraConfig for this device
-        config['cameras'][cameraConfigIndex] = {
-          ...config['cameras'][cameraConfigIndex],
-          ...options,
-        };
-      } else {
-        // cameraConfig for this device didn't exist yet
-        config['cameras'].push({
-          serialNumber: accessory.uniqueId,
-          ...options,
-        });
-      }
-    } else if (accessory && accessory.station === true) {
-      if (!Array.isArray(config['stations'])) {
-        config['stations'] = [];
-      }
-
-      let stationConfigIndex = -1;
-      config['stations'].forEach((sc: { serialNumber: string }, i: number) => {
-        if (sc.serialNumber === accessory.uniqueId) {
-          stationConfigIndex = i;
-        }
-      });
-
-      if (stationConfigIndex >= 0) {
-        // update stationConfig for this device
-        config['stations'][stationConfigIndex] = {
-          ...config['stations'][stationConfigIndex],
-          ...options,
-        };
-      } else {
-        // stationConfig for this device didn't exist yet
-        config['stations'].push({
-          serialNumber: accessory.uniqueId,
-          ...options,
-        });
-      }
-    }
-
-    this.pluginService.updateConfig(config);
+    // Update the configuration
+    await this.pluginService.updateConfig(this.config);
   }
+
+  protected async updateStationConfig(options: any, accessory: L_Station): Promise<void> {
+    await this.updateAccessoryConfig(options, accessory, 'station');
+  }
+
+  protected async updateDeviceConfig(options: any, accessory: L_Device): Promise<void> {
+    await this.updateAccessoryConfig(options, accessory, 'camera');
+  }
+
 }
