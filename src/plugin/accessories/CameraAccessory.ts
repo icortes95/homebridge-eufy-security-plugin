@@ -5,7 +5,7 @@ import { DeviceAccessory } from './Device';
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore  
-import { Camera, Device, DeviceEvents, PropertyName, CommandName } from 'eufy-security-client';
+import { Camera, Device, Station, DeviceEvents, PropertyName, CommandName } from 'eufy-security-client';
 import { StreamingDelegate } from '../controller/streamingDelegate';
 
 import { CameraConfig, VideoConfig } from '../utils/configTypes';
@@ -58,6 +58,10 @@ export class CameraAccessory extends DeviceAccessory {
       this.setupCamera();
       this.setupChimeButton();
       this.initSensorService(this.platform.Service.Battery);
+      if (this.device.isGarageCamera()) {
+        this.platform.log.debug(`${this.accessory.displayName} is a garage control camera`);
+        this.setupGarageDoorOpener();
+      }
     } else {
       this.platform.log.debug(`${this.accessory.displayName} has a motion sensor`);
       this.setupMotionFunction();
@@ -306,6 +310,65 @@ export class CameraAccessory extends DeviceAccessory {
 
     this.getService(this.platform.Service.CameraOperatingMode).setPrimaryService(true);
 
+  }
+
+  private setupGarageDoorOpener() {
+    // const door1String = 'Door 1';
+
+    this.registerCharacteristic({
+      serviceType: this.platform.Service.GarageDoorOpener,
+      characteristicType: this.platform.Characteristic.CurrentDoorState,
+      // name: this.accessory.displayName + ' ' + door1String,
+      // serviceSubType: door1String,
+      getValue: (data) => this.getGarageDoorStatus(),
+      onValue: (service, characteristic) => {
+        this.platform.log.info(`INSTALLING onValue`);
+        // const parentStation = this.device.getStation();
+        this.device.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
+        // parentStation.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
+          this.platform.log.info(`CALLING onValue`);
+          characteristic.updateValue(this.getGarageDoorStatus());
+        });
+      },
+    });
+    
+    this.registerCharacteristic({
+      serviceType: this.platform.Service.GarageDoorOpener,
+      characteristicType: this.platform.Characteristic.TargetDoorState,
+      getValue: (data) => this.getGarageDoorStatus(),
+      setValue: (value) => this.setGarageDoorTargetState(value),
+      onValue: (service, characteristic) => {
+        this.platform.log.info(`INSTALLING onValue`);
+        // const parentStation = this.device.getStation();
+        this.device.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
+        // parentStation.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
+          this.platform.log.info(`CALLING onValue`);
+          characteristic.updateValue(this.getGarageDoorStatus());
+          const state = this.getGarageDoorStatus();
+          const statusString = state ? "Open" : "Closed";
+          this.platform.log.debug(`${this.accessory.displayName} onValue: ${state} (${statusString})`);
+        });
+      },
+    });
+  }
+
+  private getGarageDoorStatus() {
+    const door1Open = this.device.getPropertyValue(PropertyName.DeviceDoor1Open);
+    const statusString = door1Open ? "Open" : "Closed";
+    this.platform.log.debug(`${this.accessory.displayName} getGarageDoorStatus: ${door1Open} (${statusString})`);
+    return !door1Open;
+  }
+
+  private async setGarageDoorTargetState(state: CharacteristicValue) {
+    try {
+      const statusString = state ? "Closed" : "Open";
+      this.platform.log.debug(`${this.accessory.displayName} setGarageDoorStatus: ${state} (${statusString})`);
+      await this.setPropertyValue(PropertyName.DeviceDoor1Open, !state);
+    } catch (error) {
+      this.platform.log.error(`${this.accessory.displayName} Garage Door target state
+      (${JSON.stringify(typeof state)} / ${JSON.stringify(state)}) 
+      could not be set: ${error}`);
+    }
   }
 
   // This private function sets up the motion sensor characteristics for the accessory.

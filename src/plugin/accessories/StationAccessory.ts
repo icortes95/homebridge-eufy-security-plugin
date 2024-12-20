@@ -42,6 +42,8 @@ export class StationAccessory extends BaseAccessory {
   ) {
     super(platform, accessory, device);
 
+    this.platform.log.warn(`STATION CONSTRUCTOR - Device type: ${this.constructor.name}}`);
+    this.platform.log.warn(`CHECKING GARAGECAM - ${this.device.hasDeviceWithType(DeviceType.CAMERA_GARAGE_T8453)}}`);
     this.platform.log.debug(`${this.accessory.displayName} Constructed Station`);
 
     this.stationConfig = this.getStationConfig();

@@ -414,9 +414,13 @@ export class EufySecurityPlatform implements DynamicPlatformPlugin {
 
       // create the accessory handler for the newly create accessory
       // this is imported from `platformAccessory.ts`
+      const props = deviceContainer.eufyDevice.getProperties();
+      this.log.info(`PROCESS ACCESSORY - NEW Device '${deviceContainer.eufyDevice.getName()}' properties: ${JSON.stringify(props, null, 4)}`);
 
       this.register_accessory(accessory, deviceContainer, false);
     } else {
+      const props = deviceContainer.eufyDevice.getProperties();
+      this.log.info(`PROCESS ACCESSORY - CACHED Device '${deviceContainer.eufyDevice.getName()}' properties: ${JSON.stringify(props, null, 4)}`);
       this.register_accessory(cachedAccessory, deviceContainer, true);
     }
   }
@@ -535,7 +539,10 @@ export class EufySecurityPlatform implements DynamicPlatformPlugin {
           || type === DeviceType.BATTERY_DOORBELL
           || type === DeviceType.BATTERY_DOORBELL_2
           || type === DeviceType.BATTERY_DOORBELL_PLUS
-          || type === DeviceType.DOORBELL_SOLO)) {
+          || type === DeviceType.DOORBELL_SOLO
+          || type === DeviceType.CAMERA_GARAGE_T8453_COMMON
+          || type === DeviceType.CAMERA_GARAGE_T8453
+          || type === DeviceType.CAMERA_GARAGE_T8452)) {
           // this.log.warn(accessory.displayName, 'looks station but it\'s not could imply some errors', 'Type:', type);
           type = DeviceType.STATION;
         } else {
@@ -590,6 +597,7 @@ export class EufySecurityPlatform implements DynamicPlatformPlugin {
       case DeviceType.BATTERY_DOORBELL_PLUS:
       case DeviceType.DOORBELL_SOLO:
         new CameraAccessory(this, accessory, device as Camera);
+        this.log.warn(`TESTING - Created CAMERA Accesory`);
         isCamera = true;
         break;
       case DeviceType.SENSOR:

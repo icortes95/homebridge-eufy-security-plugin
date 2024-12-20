@@ -70,6 +70,7 @@ export abstract class BaseAccessory extends EventEmitter {
     });
 
     if (this.platform.config.enableDetailedLogging) {
+      this.platform.log.info('DETAILED LOGGING ENABLED');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.device.on('raw property changed', (device: any, type: number, value: string) =>
         this.handleRawPropertyChange(device, type, value),
