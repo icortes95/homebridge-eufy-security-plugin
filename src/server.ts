@@ -1,24 +1,27 @@
 import { EufySecurity, EufySecurityConfig, libVersion, Device, Station, PropertyName, CommandName, DeviceType, UserType } from 'eufy-security-client';
-import { HomebridgePluginUiServer } from '@homebridge/plugin-ui-utils';
 import * as fs from 'fs';
 import { Logger as TsLogger, ILogObj } from 'tslog';
 import { createStream } from 'rotating-file-stream';
 import { Zip } from 'zip-lib';
-import { Accessory, L_Station, L_Device, LoginResult, LoginFailReason } from './configui/app/util/types';
-import { version } from '../package.json';
-import { version as nodeJSversion, argv as nodeJSargs, env as nodeJSenv } from 'node:process';
-import { satisfies } from 'semver';
+import { Accessory, L_Station, L_Device, LoginResult, LoginFailReason } from './configui/app/util/types.js';
+import { LIB_VERSION } from './version.js';
 import path from 'path';
 
-class UiServer extends HomebridgePluginUiServer {
+class UiServer {
   public stations: L_Station[] = [];
 
   private eufyClient: EufySecurity | null = null;
   private log!: TsLogger<ILogObj>;
   private tsLog!: TsLogger<ILogObj>;
-  private storagePath: string = this.homebridgeStoragePath + '/eufysecurity';
-  private storedAccessories_file: string = this.storagePath + '/accessories.json';
-  private logZipFilePath: string = this.storagePath + '/logs.zip';
+  private homebridgeStoragePath: string;
+  private storagePath: string;
+  private storedAccessories_file: string;
+  private logZipFilePath: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private pushEvent: (event: string, data: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private onRequest: (path: string, callback: (data?: any) => Promise<any>) => void;
+  private ready: () => void;
 
   private adminAccountUsed: boolean = false;
 
@@ -28,15 +31,27 @@ class UiServer extends HomebridgePluginUiServer {
     language: 'en',
     country: 'US',
     trustedDeviceName: 'My Phone',
-    persistentDir: this.storagePath,
+    persistentDir: '',
     p2pConnectionSetup: 0,
     pollingIntervalMinutes: 99,
     eventDurationSeconds: 10,
     acceptInvitations: true,
   } as EufySecurityConfig;
 
-  constructor() {
-    super();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(server: any) {
+    // Copy over properties from the HomebridgePluginUiServer instance
+    this.homebridgeStoragePath = server.homebridgeStoragePath;
+    this.pushEvent = server.pushEvent.bind(server);
+    this.onRequest = server.onRequest.bind(server);
+    this.ready = server.ready.bind(server);
+
+    // Initialize paths now that we have homebridgeStoragePath
+    this.storagePath = this.homebridgeStoragePath + '/eufysecurity';
+    this.storedAccessories_file = this.storagePath + '/accessories.json';
+    this.logZipFilePath = this.storagePath + '/logs.zip';
+    this.config.persistentDir = this.storagePath;
+
     this.initLogger();
     this.initTransportStreams();
     this.initEventListeners();
@@ -45,7 +60,7 @@ class UiServer extends HomebridgePluginUiServer {
 
   private initLogger() {
     this.log = new TsLogger({
-      name: `[${version}]`,
+      name: `[${LIB_VERSION}]`,
       prettyLogTemplate: '{{name}}\t{{logLevelName}}\t[{{fileNameWithLine}}]\t',
       prettyErrorTemplate: '\n{{errorName}} {{errorMessage}}\nerror stack:\n{{errorStack}}',
       prettyErrorStackTemplate: '  • {{fileName}}\t{{method}}\n\t{{fileNameWithLine}}',
@@ -93,7 +108,6 @@ class UiServer extends HomebridgePluginUiServer {
     this.onRequest('/storedAccessories', this.loadStoredAccessories.bind(this));
     this.onRequest('/reset', this.resetPlugin.bind(this));
     this.onRequest('/downloadLogs', this.downloadLogs.bind(this));
-    this.onRequest('/nodeJSVersion', this.nodeJSVersion.bind(this));
   }
 
   /**
@@ -129,20 +143,6 @@ class UiServer extends HomebridgePluginUiServer {
    */
   async resetAccessoryData(): Promise<void> {
     return this.deleteFileIfExists(this.storedAccessories_file);
-  }
-
-  /**
-   * Checks compatibility of the current Node.js version with Livestream functionality.
-   */
-  public nodeJSVersion() {
-    // Define versions known to break compatibility with RSA_PKCS1_PADDING
-    const nodeJSIncompatible = satisfies(nodeJSversion, '>=18.19.1 <19.x || >=20.11.1 <21.x || >=21.6.2 <22');
-    return {
-      nodeJSversion: nodeJSversion,
-      nodeJSIncompatible: nodeJSIncompatible,
-      nodeJSargs: nodeJSargs,
-      nodeJSenv: nodeJSenv,
-    };
   }
 
   async login(options): Promise<LoginResult> {
@@ -239,10 +239,10 @@ class UiServer extends HomebridgePluginUiServer {
       const { version: storedVersion, stations: storedAccessories } = JSON.parse(storedData);
 
       // Compare the stored version with the current version
-      if (storedVersion !== version) {
+      if (storedVersion !== LIB_VERSION) {
         // If the versions do not match, log a warning and push an event
-        this.pushEvent('versionUnmatched', { currentVersion: version, storedVersion: storedVersion });
-        this.log.warn(`Stored version (${storedVersion}) does not match current version (${version})`);
+        this.pushEvent('versionUnmatched', { currentVersion: LIB_VERSION, storedVersion: storedVersion });
+        this.log.warn(`Stored version (${storedVersion}) does not match current version (${LIB_VERSION})`);
       }
 
       // Return the parsed accessories
@@ -358,7 +358,7 @@ class UiServer extends HomebridgePluginUiServer {
   }
 
   storeAccessories() {
-    const dataToStore = { version: version, stations: this.stations };
+    const dataToStore = { version: LIB_VERSION, stations: this.stations };
     fs.writeFileSync(this.storedAccessories_file, JSON.stringify(dataToStore));
   }
 
@@ -463,5 +463,19 @@ class UiServer extends HomebridgePluginUiServer {
   }
 }
 
-// Start the instance of the server
-new UiServer();
+// Start the instance of the server with dynamic import
+(async () => {
+  try {
+    // Dynamically import the ESM module
+    const pluginUiUtils = await import('@homebridge/plugin-ui-utils');
+    const HomebridgePluginUiServer = pluginUiUtils.HomebridgePluginUiServer;
+
+    // Create an instance of HomebridgePluginUiServer
+    const server = new HomebridgePluginUiServer();
+
+    // Initialize our UiServer with the server instance
+    new UiServer(server);
+  } catch (error) {
+    console.error('Failed to initialize server:', error);
+  }
+})();
