@@ -126,10 +126,19 @@ dist
 
 .angular
 
-homebridge-ui/
-
 src/plugin/version.ts
 src/version.ts
+homebridge-ui/version.ts
 
 TODO
+
+docker-compose.yml
+volumes
+
 .DS_Store
+
+diagnostics-*
+.idea
+
+# Keys directory — contains RSA key pair for diagnostics encryption
+keys/
