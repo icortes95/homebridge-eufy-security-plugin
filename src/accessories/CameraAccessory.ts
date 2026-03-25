@@ -20,7 +20,7 @@ import { DeviceAccessory } from './Device.js';
 
 
 // @ts-ignore
-import { Camera, DeviceEvents, PropertyName, CommandName, StreamMetadata, PropertyValue, GarageDoorState } from 'eufy-security-client';
+import { Camera, DeviceEvents, PropertyName, CommandName, StreamMetadata, PropertyValue } from 'eufy-security-client';
 
 import { CameraConfig, DEFAULT_CAMERACONFIG_VALUES } from '../utils/configTypes.js';
 import { CHAR, SERV } from '../utils/utils.js';
@@ -92,9 +92,6 @@ export class CameraAccessory extends DeviceAccessory {
   protected streamingDelegate: StreamingDelegate | null = null;
   protected recordingDelegate?: RecordingDelegate | null = null;
 
-  private doorStates: Map<number, number> = new Map();
-  private doorCharacteristics: Map<number, { current: Characteristic; target: Characteristic }> = new Map();
-
   public resolutions: Resolution[] = [
     [1920, 1024, 30],
     [1280, 720, 30],
@@ -141,10 +138,6 @@ export class CameraAccessory extends DeviceAccessory {
     this.setupMotionButton();
     this.setupLightButton();
     this.setupChimeButton();
-    if (this.device.isGarageCamera()) {
-      this.log.debug(`${this.accessory.displayName} is a garage control camera`);
-      this.setupGarageDoorOpener();
-    }
 
     this.pruneUnusedServices();
   }
@@ -338,183 +331,6 @@ export class CameraAccessory extends DeviceAccessory {
       });
     }
 
-  }
-
-  private async setupGarageDoorOpener() {
-    const doors: (1 | 2)[] = [];
-
-    if (this.cameraConfig.enableDoor1 && this.device.hasProperty(PropertyName.DeviceDoor1Open)) {
-      doors.push(1);
-    }
-    if (this.cameraConfig.enableDoor2 && this.device.hasProperty(PropertyName.DeviceDoor2Open)) {
-      doors.push(2);
-    }
-
-    if (doors.length === 0) {
-      this.log.debug('No garage doors detected or all disabled in config');
-      return;
-    }
-
-    for (const doorId of doors) {
-      this.setupSingleGarageDoor(doorId);
-    }
-
-    // Listen for garage door status events on the station (not the device)
-    try {
-      const station = await this.platform.eufyClient.getStation(this.device.getStationSerial());
-      station.on('garage door status', (_station: any, channel: number, doorId: number, status: number) => {
-        const hkState = this.mapGarageDoorState(status);
-        this.doorStates.set(doorId, hkState);
-        this.log.debug(`Garage door ${doorId} status event: ${status} -> HomeKit state ${hkState}`);
-
-        const chars = this.doorCharacteristics.get(doorId);
-        if (chars) {
-          chars.current.updateValue(hkState);
-          chars.target.updateValue(this.targetFromCurrent(hkState));
-        }
-      });
-    } catch (error) {
-      this.log.warn(`Could not set up garage door station event listener: ${error}`);
-    }
-  }
-
-  private setupSingleGarageDoor(doorId: 1 | 2) {
-    const configName = doorId === 1 ? this.cameraConfig.door1Name : this.cameraConfig.door2Name;
-    const doorName = configName || `Garage Door ${doorId}`;
-    const subType = `Door ${doorId}`;
-
-    this.log.debug(`Setting up garage door: ${doorName} (subType: ${subType})`);
-
-    this.registerCharacteristic({
-      serviceType: SERV.GarageDoorOpener,
-      characteristicType: CHAR.CurrentDoorState,
-      name: doorName,
-      serviceSubType: subType,
-      getValue: () => this.getDoorCurrentState(doorId),
-      onValue: (_service, characteristic) => {
-        this.doorCharacteristics.set(doorId, {
-          current: characteristic,
-          target: this.doorCharacteristics.get(doorId)?.target ?? characteristic,
-        });
-      },
-    });
-
-    this.registerCharacteristic({
-      serviceType: SERV.GarageDoorOpener,
-      characteristicType: CHAR.TargetDoorState,
-      name: doorName,
-      serviceSubType: subType,
-      getValue: () => this.targetFromCurrent(this.getDoorCurrentState(doorId)),
-      setValue: (value) => this.setDoorTargetState(doorId, value),
-      onValue: (_service, characteristic) => {
-        const existing = this.doorCharacteristics.get(doorId);
-        this.doorCharacteristics.set(doorId, {
-          current: existing?.current ?? characteristic,
-          target: characteristic,
-        });
-      },
-    });
-
-    this.registerCharacteristic({
-      serviceType: SERV.GarageDoorOpener,
-      characteristicType: CHAR.ObstructionDetected,
-      name: doorName,
-      serviceSubType: subType,
-      getValue: () => false,
-    });
-
-    this.setupDoorSensorBattery(doorId, doorName);
-  }
-
-  private setupDoorSensorBattery(doorId: 1 | 2, doorName: string) {
-    const batteryLevelProp = doorId === 1
-      ? PropertyName.DeviceDoorSensor1BatteryLevel
-      : PropertyName.DeviceDoorSensor2BatteryLevel;
-    const lowBatteryProp = doorId === 1
-      ? PropertyName.DeviceDoorSensor1LowBattery
-      : PropertyName.DeviceDoorSensor2LowBattery;
-
-    if (!this.device.hasProperty(batteryLevelProp)) {
-      this.log.debug(`Door ${doorId} sensor battery properties not available`);
-      return;
-    }
-
-    const subType = `Door ${doorId} Battery`;
-    const sensorName = `${doorName} Sensor`;
-
-    this.registerCharacteristic({
-      serviceType: SERV.Battery,
-      characteristicType: CHAR.BatteryLevel,
-      name: sensorName,
-      serviceSubType: subType,
-      getValue: () => this.device.getPropertyValue(batteryLevelProp) || 100,
-    });
-
-    if (this.device.hasProperty(lowBatteryProp)) {
-      this.registerCharacteristic({
-        serviceType: SERV.Battery,
-        characteristicType: CHAR.StatusLowBattery,
-        name: sensorName,
-        serviceSubType: subType,
-        getValue: () => {
-          const isLow = this.device.getPropertyValue(lowBatteryProp);
-          return isLow
-            ? CHAR.StatusLowBattery.BATTERY_LEVEL_LOW
-            : CHAR.StatusLowBattery.BATTERY_LEVEL_NORMAL;
-        },
-      });
-    }
-  }
-
-  private getDoorCurrentState(doorId: 1 | 2): number {
-    if (this.doorStates.has(doorId)) {
-      return this.doorStates.get(doorId)!;
-    }
-    const prop = doorId === 1 ? PropertyName.DeviceDoor1Open : PropertyName.DeviceDoor2Open;
-    const doorOpen = this.device.getPropertyValue(prop);
-    return doorOpen ? 0 : 1; // true=OPEN(0), false=CLOSED(1)
-  }
-
-  private async setDoorTargetState(doorId: number, state: CharacteristicValue) {
-    try {
-      const shouldOpen = state === 0;
-      this.log.debug(`Setting door ${doorId} target state: ${shouldOpen ? 'Open' : 'Closed'}`);
-      const station = await this.platform.eufyClient.getStation(this.device.getStationSerial());
-      station.openDoor(this.device, shouldOpen, doorId);
-    } catch (error) {
-      this.log.error(`Door ${doorId} target state could not be set: ${error}`);
-    }
-  }
-
-  private mapGarageDoorState(status: number): number {
-    switch (status) {
-      case GarageDoorState.A_OPENED:
-      case GarageDoorState.B_OPENED:
-        return 0; // OPEN
-      case GarageDoorState.A_CLOSED:
-      case GarageDoorState.B_CLOSED:
-        return 1; // CLOSED
-      case GarageDoorState.A_OPENING:
-      case GarageDoorState.B_OPENING:
-        return 2; // OPENING
-      case GarageDoorState.A_CLOSING:
-      case GarageDoorState.B_CLOSING:
-        return 3; // CLOSING
-      default: // NO_MOTOR, UNKNOWN
-        return 4; // STOPPED
-    }
-  }
-
-  private targetFromCurrent(currentState: number): number {
-    switch (currentState) {
-      case 0: // OPEN
-      case 2: // OPENING
-        return 0; // Target: OPEN
-      case 1: // CLOSED
-      case 3: // CLOSING
-      default:
-        return 1; // Target: CLOSED
-    }
   }
 
   // This private function sets up the motion sensor characteristics for the accessory.
