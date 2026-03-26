@@ -276,10 +276,10 @@ const DeviceDetailView = {
         },
       });
 
-      // ── HomeKit Switches ──
+      // ── Camera Buttons ──
       const btnTitle = document.createElement('div');
       btnTitle.className = 'detail-section__title';
-      btnTitle.textContent = 'HomeKit Switches';
+      btnTitle.textContent = 'Camera Buttons';
       advSection.appendChild(btnTitle);
 
       if (device.DeviceMotionDetection) {
@@ -287,7 +287,7 @@ const DeviceDetailView = {
           id: 'toggle-motion',
           label: 'Motion Detection Toggle',
           help: 'Adds a virtual switch to HomeKit that lets you turn motion detection on or off. The motion sensor itself is always active — this only controls whether detection events are triggered.',
-          checked: device.isGarageCamera ? !!deviceConfig.motionButton : deviceConfig.motionButton !== false,
+          checked: !!deviceConfig.motionButton,
           onChange: async (checked) => {
             await Config.updateDeviceConfig(device.uniqueId, { motionButton: checked });
           },
@@ -296,9 +296,9 @@ const DeviceDetailView = {
 
       Toggle.render(advSection, {
         id: 'toggle-enable-btn',
-        label: 'Camera On/Off Toggle',
+        label: 'Camera Enable Toggle',
         help: 'Adds a virtual switch to HomeKit that lets you enable or disable the camera. When the camera is disabled, streaming and recording stop but the device remains registered.',
-        checked: device.isGarageCamera ? !!deviceConfig.enableButton : deviceConfig.enableButton !== false,
+        checked: !!deviceConfig.enableButton,
         onChange: async (checked) => {
           await Config.updateDeviceConfig(device.uniqueId, { enableButton: checked });
         },
@@ -309,7 +309,7 @@ const DeviceDetailView = {
           id: 'toggle-light-btn',
           label: 'Spotlight / Floodlight Toggle',
           help: 'Adds a virtual switch to HomeKit that lets you turn the camera\'s built-in spotlight or floodlight on and off.',
-          checked: device.isGarageCamera ? !!deviceConfig.lightButton : deviceConfig.lightButton !== false,
+          checked: !!deviceConfig.lightButton,
           onChange: async (checked) => {
             await Config.updateDeviceConfig(device.uniqueId, { lightButton: checked });
           },
