@@ -87,7 +87,11 @@ export class GarageDoorAccessory extends DeviceAccessory {
     this.registerCharacteristic({
       serviceType: SERV.Battery,
       characteristicType: CHAR.BatteryLevel,
-      getValue: () => this.device.getPropertyValue(batteryLevelProp) || 100,
+      getValue: () => {
+        // eufy reports battery on a 0-5 scale; HomeKit expects 0-100
+        const raw = this.device.getPropertyValue(batteryLevelProp) as number;
+        return raw != null ? Math.round((raw / 5) * 100) : 100;
+      },
     });
 
     if (this.device.hasProperty(lowBatteryProp)) {
