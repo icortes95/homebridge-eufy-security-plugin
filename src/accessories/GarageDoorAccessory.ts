@@ -147,22 +147,30 @@ export class GarageDoorAccessory extends DeviceAccessory {
   }
 
   private mapGarageDoorState(status: number): number {
-    switch (status) {
-      case GarageDoorState.A_OPENED:
-      case GarageDoorState.B_OPENED:
-        return 0; // OPEN
-      case GarageDoorState.A_CLOSED:
-      case GarageDoorState.B_CLOSED:
-        return 1; // CLOSED
-      case GarageDoorState.A_OPENING:
-      case GarageDoorState.B_OPENING:
-        return 2; // OPENING
-      case GarageDoorState.A_CLOSING:
-      case GarageDoorState.B_CLOSING:
-        return 3; // CLOSING
-      default: // NO_MOTOR, UNKNOWN
-        return 4; // STOPPED
+    // Negative values are standalone transitional states
+    if (status < 0) {
+      switch (status) {
+        case GarageDoorState.A_OPENING:
+        case GarageDoorState.B_OPENING:
+          return 2; // OPENING
+        case GarageDoorState.A_CLOSING:
+        case GarageDoorState.B_CLOSING:
+          return 3; // CLOSING
+        default: // NO_MOTOR
+          return 4; // STOPPED
+      }
     }
+
+    // Positive values are bitmasks — extract bits for this door
+    if (this.doorId === 1) {
+      if (status & GarageDoorState.A_OPENED) return 0; // OPEN
+      if (status & GarageDoorState.A_CLOSED) return 1; // CLOSED
+    } else {
+      if (status & GarageDoorState.B_OPENED) return 0; // OPEN
+      if (status & GarageDoorState.B_CLOSED) return 1; // CLOSED
+    }
+
+    return 4; // UNKNOWN → STOPPED
   }
 
   private targetFromCurrent(currentState: number): number {
