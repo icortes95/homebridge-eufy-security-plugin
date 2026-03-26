@@ -19,8 +19,8 @@ import { EufySecurityPlatform } from '../platform.js';
 import { DeviceAccessory } from './Device.js';
 
 
-// @ts-ignore  
-import { Camera, Station, DeviceEvents, PropertyName, CommandName, StreamMetadata, PropertyValue } from 'eufy-security-client';
+// @ts-ignore
+import { Camera, DeviceEvents, PropertyName, CommandName, StreamMetadata, PropertyValue } from 'eufy-security-client';
 
 import { CameraConfig, DEFAULT_CAMERACONFIG_VALUES } from '../utils/configTypes.js';
 import { CHAR, SERV } from '../utils/utils.js';
@@ -62,6 +62,9 @@ export class CameraAccessory extends DeviceAccessory {
   private notificationTimeout: NodeJS.Timeout | null = null;
 
   public readonly cameraConfig: CameraConfig;
+
+  /** Display name prefix for services. Garage cameras use "Garage Camera" instead of the device name. */
+  private readonly servicePrefix: string;
 
   public hardwareTranscoding: boolean = true;
   public hardwareDecoding: boolean = true;
@@ -116,6 +119,8 @@ export class CameraAccessory extends DeviceAccessory {
 
     this.cameraStatus = { isEnabled: false, timestamp: 0 }; // Initialize the cameraStatus object
 
+    this.servicePrefix = device.isGarageCamera() ? 'Garage Camera' : this.name;
+
     this.log.debug(`Constructed Camera`);
 
     this.cameraConfig = this.getCameraConfig();
@@ -138,12 +143,28 @@ export class CameraAccessory extends DeviceAccessory {
     this.setupMotionButton();
     this.setupLightButton();
     this.setupChimeButton();
+
+    // For garage cameras, set ConfiguredName on all named services so
+    // HomeKit shows descriptive names for accessories (buttons, sensors, etc.)
     if (this.device.isGarageCamera()) {
-      this.log.debug(`${this.accessory.displayName} is a garage control camera`);
-      this.setupGarageDoorOpener();
+      this.applyServiceNames();
     }
 
     this.pruneUnusedServices();
+  }
+
+  private applyServiceNames() {
+    for (const service of this.accessory.services) {
+      if (service.UUID === SERV.AccessoryInformation.UUID) continue;
+      const name = service.displayName;
+      if (!name) continue;
+
+      if (!service.testCharacteristic(CHAR.ConfiguredName)) {
+        service.addOptionalCharacteristic(CHAR.ConfiguredName);
+      }
+      service.updateCharacteristic(CHAR.ConfiguredName, name);
+      service.updateCharacteristic(CHAR.Name, name);
+    }
   }
 
   private setupCamera() {
@@ -194,7 +215,7 @@ export class CameraAccessory extends DeviceAccessory {
     this.registerCharacteristic({
       serviceType: platformServiceMapping[serviceType] || SERV.Switch,
       characteristicType: CHAR.On,
-      name: this.accessory.displayName + ' ' + serviceName,
+      name: this.servicePrefix + ' ' + serviceName,
       serviceSubType: serviceName,
       getValue: (data, characteristic) => this.getCameraPropertyValue(characteristic, propertyName),
       setValue: (value, characteristic) => this.setCameraPropertyValue(characteristic, propertyName, value),
@@ -206,7 +227,7 @@ export class CameraAccessory extends DeviceAccessory {
   }
 
   private async setupMotionButton() {
-    this.setupButtonService('Motion', this.cameraConfig.motionButton, PropertyName.DeviceMotionDetection, 'switch');
+    this.setupButtonService('Motion Sensor Enabled', this.cameraConfig.motionButton, PropertyName.DeviceMotionDetection, 'switch');
   }
 
   private async setupLightButton() {
@@ -268,6 +289,8 @@ export class CameraAccessory extends DeviceAccessory {
     this.registerCharacteristic({
       serviceType: SERV.MotionSensor,
       characteristicType: CHAR.MotionDetected,
+      name: this.servicePrefix + ' Motion Detected',
+      serviceSubType: 'Motion Sensor',
       getValue: () => this.device.getPropertyValue(PropertyName.DeviceMotionDetected),
       onValue: (service, characteristic) => {
         this.eventTypesToHandle.forEach(eventType => {
@@ -329,71 +352,14 @@ export class CameraAccessory extends DeviceAccessory {
 
   }
 
-  private setupGarageDoorOpener() {
-    // const door1String = 'Door 1';
-
-    this.registerCharacteristic({
-      serviceType: SERV.GarageDoorOpener,
-      characteristicType: CHAR.CurrentDoorState,
-      // name: this.accessory.displayName + ' ' + door1String,
-      // serviceSubType: door1String,
-      getValue: (data) => this.getGarageDoorStatus(),
-      onValue: (service, characteristic) => {
-        this.log.info(`INSTALLING onValue`);
-        // const parentStation = this.device.getStation();
-        this.device.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
-        // parentStation.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
-          this.log.info(`CALLING onValue`);
-          characteristic.updateValue(this.getGarageDoorStatus());
-        });
-      },
-    });
-
-    this.registerCharacteristic({
-      serviceType: SERV.GarageDoorOpener,
-      characteristicType: CHAR.TargetDoorState,
-      getValue: (data) => this.getGarageDoorStatus(),
-      setValue: (value) => this.setGarageDoorTargetState(value),
-      onValue: (service, characteristic) => {
-        this.log.info(`INSTALLING onValue`);
-        // const parentStation = this.device.getStation();
-        this.device.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
-        // parentStation.on('garage door status', (station: Station, channel: Number, doorId: Number, status: Number) => {
-          this.log.info(`CALLING onValue`);
-          characteristic.updateValue(this.getGarageDoorStatus());
-          const state = this.getGarageDoorStatus();
-          const statusString = state ? "Open" : "Closed";
-          this.log.debug(`${this.accessory.displayName} onValue: ${state} (${statusString})`);
-        });
-      },
-    });
-  }
-
-  private getGarageDoorStatus() {
-    const door1Open = this.device.getPropertyValue(PropertyName.DeviceDoor1Open);
-    const statusString = door1Open ? "Open" : "Closed";
-    this.log.debug(`${this.accessory.displayName} getGarageDoorStatus: ${door1Open} (${statusString})`);
-    return !door1Open;
-  }
-
-  private async setGarageDoorTargetState(state: CharacteristicValue) {
-    try {
-      const statusString = state ? "Closed" : "Open";
-      this.log.debug(`${this.accessory.displayName} setGarageDoorStatus: ${state} (${statusString})`);
-      await this.setPropertyValue(PropertyName.DeviceDoor1Open, !state);
-    } catch (error) {
-      this.log.error(`${this.accessory.displayName} Garage Door target state
-      (${JSON.stringify(typeof state)} / ${JSON.stringify(state)}) 
-      could not be set: ${error}`);
-    }
-  }
-
   // This private function sets up the motion sensor characteristics for the accessory.
   private setupMotionFunction() {
     // Register the motion sensor characteristic for detecting motion.
     this.registerCharacteristic({
       serviceType: SERV.MotionSensor,
       characteristicType: CHAR.MotionDetected,
+      name: this.servicePrefix + ' Motion Detected',
+      serviceSubType: 'Motion Sensor',
       getValue: () => this.device.getPropertyValue(PropertyName.DeviceMotionDetected),
       onMultipleValue: this.eventTypesToHandle,
     });
@@ -403,6 +369,8 @@ export class CameraAccessory extends DeviceAccessory {
     this.registerCharacteristic({
       serviceType: SERV.MotionSensor,
       characteristicType: CHAR.StatusTampered,
+      name: this.servicePrefix + ' Motion Detected',
+      serviceSubType: 'Motion Sensor',
       getValue: () => {
         const tampered = this.device.getPropertyValue(PropertyName.DeviceEnabled);
         this.log.debug(`TAMPERED? ${!tampered}`);
@@ -625,7 +593,7 @@ export class CameraAccessory extends DeviceAccessory {
         delegate: this.recordingDelegate as RecordingDelegate,
       },
       sensors: {
-        motion: this.getService(SERV.MotionSensor),
+        motion: this.getService(SERV.MotionSensor, this.servicePrefix + ' Motion Detected', 'Motion Sensor'),
         occupancy: undefined,
       },
     };
