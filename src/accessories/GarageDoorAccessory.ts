@@ -131,7 +131,10 @@ export class GarageDoorAccessory extends DeviceAccessory {
   }
 
   private getDoorCurrentState(): number {
-    if (this.doorState !== undefined) {
+    // Use cached event state only for transitional states (OPENING/CLOSING)
+    // that the boolean property can't represent. For resting states, always
+    // read the property so that manual/physical door changes are reflected.
+    if (this.doorState === 2 || this.doorState === 3) {
       return this.doorState;
     }
     const prop = this.doorId === 1 ? PropertyName.DeviceDoor1Open : PropertyName.DeviceDoor2Open;
